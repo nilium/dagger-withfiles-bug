@@ -15,18 +15,33 @@
 package main
 
 import (
+	"context"
 	"dagger/withfiles/internal/dagger"
+	"fmt"
 )
+
+const FileContent = "something"
 
 type Withfiles struct{}
 
 func (m *Withfiles) Container() *dagger.Container {
 	dir := dag.Directory().
-		WithFile("/sub/file", dag.File("file", "contents", dagger.FileOpts{Permissions: 0644})).
+		WithFile("/sub/file", dag.File("file", FileContent, dagger.FileOpts{Permissions: 0644})).
 		Directory("/sub")
 	return dag.Container().
 		From("alpine:3.22.1").
 		WithFiles("/opt", []*dagger.File{
 			dir.File("file"),
 		})
+}
+
+func (m *Withfiles) CheckFile(ctx context.Context, file string) error {
+	contents, err := m.Container().File(file).Contents(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting file at expected path %q: %w", file, err)
+	}
+	if contents != FileContent {
+		return fmt.Errorf("unexpected file contents: got %q, want %q", contents, FileContent)
+	}
+	return nil
 }
